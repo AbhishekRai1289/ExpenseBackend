@@ -6,7 +6,7 @@ const ExpenseSchema = new Schema({
   from: { type: String, required: true },
   distance: { type: Number, required: true },
   da: { type: Number, required: true },
-  orderbooked: { type: Boolean, required: true },
+  orderbooked: { type: Number, required: true },
   fare: { type: Number, required: true },
   totalAmount: { type: Number, required: true },
   date: { type: Date, required: true },
