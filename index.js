@@ -19,9 +19,14 @@ mongoose.connect(process.env.MONGODB_URI)
         console.error('Error connecting to MongoDB:', error);
     });
 
+
+    
 // Routes
 const expenseFormRoutes = require('./route/expense_form');
 app.use('/api', expenseFormRoutes);
+
+
+
 
 // Server
 const port = process.env.PORT || 3000;

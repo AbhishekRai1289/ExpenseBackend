@@ -9,6 +9,16 @@ const addExpenseForm = async (req, res) => {
     const fare = Number(distance) * 2.5;
     const totalAmount = fare + da;
 
+    const findExpenseByDate = await Expense.findOne({ date: new Date(date) });
+    if (findExpenseByDate) {
+      return res.status(400).json({ message: "An expense form for this date already exists." });
+    }
+
+    const findExpensePrevious = await Expense.findOne({ from, date: { $lt: new Date(date) } }).sort({ date: -1 });
+    if (findExpensePrevious) {
+     return res.status(404).json({ message: "Please Fill Previous Date Expense Form" });
+    }
+
     const newExpense = new Expense({
       to,
       from,
