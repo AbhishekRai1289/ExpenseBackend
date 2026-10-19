@@ -4,37 +4,61 @@ const addExpenseForm = async (req, res) => {
   try {
     const { to, from, distance, orderbooked, date, location } = req.body;
 
-    // Automatically assign DA based on location
-    const da = location === "in" ? 300 : 1200;
-    const fare = Number(distance) * 2.5;
-    const totalAmount = fare + da;
+    // 1. Normalize target date to midnight
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
 
-    const findExpenseByDate = await Expense.findOne({ date: new Date(date) });
-    if (findExpenseByDate) {
+    // 2. Prevent duplicate entries for the same date
+    const nextDay = new Date(targetDate);
+    nextDay.setDate(targetDate.getDate() + 1);
+
+    const existingExpense = await Expense.findOne({
+      date: { $gte: targetDate, $lt: nextDay }
+    });
+
+    if (existingExpense) {
       return res.status(400).json({ message: "An expense form for this date already exists." });
     }
 
-    const findExpensePrevious = await Expense.findOne({ from, date: { $lt: new Date(date) } }).sort({ date: -1 });
-    if (findExpensePrevious) {
-     return res.status(404).json({ message: "Please Fill Previous Date Expense Form" });
+    // 3. Find the most recent record prior to targetDate
+    const lastExpense = await Expense.findOne({
+      date: { $lt: targetDate }
+    }).sort({ date: -1 });
+
+    // 4. Block if previous date is missing
+    if (lastExpense) {
+      const lastDate = new Date(lastExpense.date);
+      lastDate.setHours(0, 0, 0, 0);
+
+      const dayDifference = Math.round((targetDate - lastDate) / (1000 * 60 * 60 * 24));
+
+      // If more than 1 day apart, previous date is missing
+      if (dayDifference > 1) {
+        return res.status(404).json({ message: "Please Fill Previous Date Expense Form" });
+      }
     }
+
+    // 5. Calculate and save
+    const da = location === "in" ? 300 : 1200;
+    const fare = Number(distance) * 2.5;
+    const totalAmount = fare + da;
 
     const newExpense = new Expense({
       to,
       from,
       distance: Number(distance),
       da,
-      orderbooked,
-      date,
+      orderbooked: Number(orderbooked),
+      date: targetDate,
       fare,
       totalAmount,
       location
     });
 
     await newExpense.save();
-    res.status(201).json(newExpense);
+    return res.status(201).json(newExpense);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
