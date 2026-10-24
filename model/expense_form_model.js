@@ -51,6 +51,7 @@ extraExpenseSchema.pre('save', function (next) {
   next();
 });
 
-module.exports = mongoose.model('ExtraExpense', extraExpenseSchema);
 const Expense = mongoose.model('Expense_form', ExpenseSchema);
 module.exports = Expense;
+
+module.exports = mongoose.model('ExtraExpense', extraExpenseSchema);
