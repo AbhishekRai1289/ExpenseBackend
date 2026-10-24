@@ -46,10 +46,8 @@ const extraExpenseSchema = new Schema(
   }
 );
 
-extraExpenseSchema.pre('save', function (next) {
-  this.totalExpense =
-    (this.post || 0) + (this.photocopy || 0) + (this.mobileAllo || 0);
-  next();
+extraExpenseSchema.pre('save', async function () {
+  this.totalExpense = (this.post || 0) + (this.photocopy || 0) + (this.mobileAllo || 0);
 });
 
 // Explicitly bind to your MongoDB collection name (3rd parameter)

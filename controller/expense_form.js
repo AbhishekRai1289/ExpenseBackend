@@ -118,7 +118,7 @@ const getExpenseForms = async (req, res) => {
   }
 };
 
-const ExtraExpense = require('../model/expense_form_model'); // Adjust path to your model
+const {ExtraExpense} = require('../model/expense_form_model'); // Adjust path to your model
 
 const extraExpense = async (req, res) => {
   try {
