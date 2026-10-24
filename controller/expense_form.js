@@ -1,4 +1,4 @@
-const Expense = require('../model/expense_form_model');
+const {Expense} = require('../model/expense_form_model');
 
 const addExpenseForm = async (req, res) => {
   try {
@@ -74,9 +74,12 @@ const getExpenseForms = async (req, res) => {
     }
 
     // 2. Filter by 'from' (if it represents a sender, vendor, or user)
-    if (from) {
-      filter.from = { $regex: from, $options: 'i' };
-    }
+   if (from) {
+  filter.$or = [
+    { from: { $regex: from, $options: 'i' } },
+    { fromStation: { $regex: from, $options: 'i' } }
+  ];
+}
 
     // 3. Date Filtering
     if (date) {
@@ -152,6 +155,6 @@ const extraExpense = async (req, res) => {
   }
 };
 
-exports.extraExpense
+exports.extraExpense = extraExpense;
 exports.addExpenseForm = addExpenseForm;
 exports.getExpenseForms = getExpenseForms;

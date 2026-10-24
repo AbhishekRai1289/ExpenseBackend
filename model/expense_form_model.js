@@ -10,48 +10,54 @@ const ExpenseSchema = new Schema({
   fare: { type: Number, required: true },
   totalAmount: { type: Number, required: true },
   date: { type: Date, required: true },
-  location: { type: String, required: true }
+  location: { type: String, required: true },
 });
 
 const extraExpenseSchema = new Schema(
   {
-    post: { 
-      type: Number, 
-      required: true, 
-      default: 0 
+    post: {
+      type: Number,
+      required: true,
+      default: 0,
     },
-    photocopy: { 
-      type: Number, 
-      required: true, 
-      default: 0 
+    photocopy: {
+      type: Number,
+      required: true,
+      default: 0,
     },
-    mobileAllo: { 
-      type: Number, 
-      required: true, 
-      default: 0 
+    mobileAllo: {
+      type: Number,
+      required: true,
+      default: 0,
     },
-    totalExpense: { 
-      type: Number, 
-      required: true, 
-      default: 0 
+    totalExpense: {
+      type: Number,
+      required: true,
+      default: 0,
     },
-    date: { 
-      type: Date, 
-      required: true, 
-      default: Date.now 
+    date: {
+      type: Date,
+      required: true,
+      default: Date.now,
     },
   },
-  { 
-    timestamps: true 
+  {
+    timestamps: true,
   }
 );
 
 extraExpenseSchema.pre('save', function (next) {
-  this.totalExpense = (this.post || 0) + (this.photocopy || 0) + (this.mobileAllo || 0);
+  this.totalExpense =
+    (this.post || 0) + (this.photocopy || 0) + (this.mobileAllo || 0);
   next();
 });
 
-const Expense = mongoose.model('Expense_form', ExpenseSchema);
-module.exports = Expense;
+// Explicitly bind to your MongoDB collection name (3rd parameter)
+const Expense = mongoose.model('Expense_form', ExpenseSchema, 'expense_forms');
+const ExtraExpense = mongoose.model('ExtraExpense', extraExpenseSchema, 'extraexpenses');
 
-module.exports = mongoose.model('ExtraExpense', extraExpenseSchema);
+// Export both models together
+module.exports = {
+  Expense,
+  ExtraExpense,
+};
