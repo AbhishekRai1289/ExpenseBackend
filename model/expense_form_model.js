@@ -13,5 +13,44 @@ const ExpenseSchema = new Schema({
   location: { type: String, required: true }
 });
 
+const extraExpenseSchema = new Schema(
+  {
+    post: { 
+      type: Number, 
+      required: true, 
+      default: 0 
+    },
+    photocopy: { 
+      type: Number, 
+      required: true, 
+      default: 0 
+    },
+    mobileAllo: { 
+      type: Number, 
+      required: true, 
+      default: 0 
+    },
+    totalExpense: { 
+      type: Number, 
+      required: true, 
+      default: 0 
+    },
+    date: { 
+      type: Date, 
+      required: true, 
+      default: Date.now 
+    },
+  },
+  { 
+    timestamps: true 
+  }
+);
+
+extraExpenseSchema.pre('save', function (next) {
+  this.totalExpense = (this.post || 0) + (this.photocopy || 0) + (this.mobileAllo || 0);
+  next();
+});
+
+module.exports = mongoose.model('ExtraExpense', extraExpenseSchema);
 const Expense = mongoose.model('Expense_form', ExpenseSchema);
 module.exports = Expense;

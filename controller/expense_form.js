@@ -115,5 +115,43 @@ const getExpenseForms = async (req, res) => {
   }
 };
 
+const ExtraExpense = require('../models/ExtraExpense'); // Adjust path to your model
+
+const extraExpense = async (req, res) => {
+  try {
+    const { post, photocopy, mobileAllo, date } = req.body;
+
+    // Convert and default values to 0 if not provided
+    const parsedPost = Number(post) || 0;
+    const parsedPhotocopy = Number(photocopy) || 0;
+    const parsedMobileAllo = Number(mobileAllo) || 0;
+
+    // Calculate total
+    const totalExpense = parsedPost + parsedPhotocopy + parsedMobileAllo;
+
+    const newExpense = new ExtraExpense({
+      post: parsedPost,
+      photocopy: parsedPhotocopy,
+      mobileAllo: parsedMobileAllo,
+      totalExpense,
+      date: date ? new Date(date) : new Date(),
+    });
+
+    const savedExpense = await newExpense.save();
+
+    return res.status(201).json({
+      success: true,
+      message: 'Extra expense saved successfully',
+      data: savedExpense,
+    });
+  } catch (err) {
+    return res.status(500).json({ 
+      success: false, 
+      message: err.message 
+    });
+  }
+};
+
+exports.extraExpense
 exports.addExpenseForm = addExpenseForm;
 exports.getExpenseForms = getExpenseForms;
