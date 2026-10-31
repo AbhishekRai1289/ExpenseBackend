@@ -4,46 +4,15 @@ const addExpenseForm = async (req, res) => {
   try {
     const { to, from, distance, orderbooked, date, location } = req.body;
 
-    // 1. Normalize target date to midnight
-    const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0);
-
-    // 2. Prevent duplicate entries for the same date
-    const nextDay = new Date(targetDate);
-    nextDay.setDate(targetDate.getDate() + 1);
-
-    const existingExpense = await Expense.findOne({
-      date: { $gte: targetDate, $lt: nextDay }
-    });
-
-    if (existingExpense) {
-      return res.status(400).json({ message: "An expense form for this date already exists." });
-    }
-
-    // 3. Find the most recent record prior to targetDate
-    const lastExpense = await Expense.findOne({
-      date: { $lt: targetDate }
-    }).sort({ date: -1 });
-
-    // 4. Block if previous date is missing
-    if (lastExpense) {
-      const lastDate = new Date(lastExpense.date);
-      lastDate.setHours(0, 0, 0, 0);
-
-      const dayDifference = Math.round((targetDate - lastDate) / (1000 * 60 * 60 * 24));
-
-      // If more than 1 day apart, previous date is missing
-      if (dayDifference > 1) {
-        return res.status(404).json({ message: "Please Fill Previous Date Expense Form" });
-      }
-    }
-
-    // 5. Calculate and save
     const da = location === "in" ? 300 : 1200;
     const fare = Number(distance) * 2.5;
     const totalAmount = fare + da;
 
-    const newExpense = new Expense({
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    // Plain data object without an automatic _id
+    const expenseData = {
       to,
       from,
       distance: Number(distance),
@@ -53,8 +22,49 @@ const addExpenseForm = async (req, res) => {
       fare,
       totalAmount,
       location
+    };
+
+    // Prevent duplicate entries for the same date
+    const nextDay = new Date(targetDate);
+    nextDay.setDate(targetDate.getDate() + 1);
+
+    const existingExpense = await Expense.findOne({
+      date: { $gte: targetDate, $lt: nextDay }
     });
 
+    if (existingExpense) {
+      const updatedExpense = await Expense.findByIdAndUpdate(
+        existingExpense._id,
+        { $set: expenseData },
+        { new: true, runValidators: true }
+      );
+      return res.status(200).json({
+        message: "Expense updated successfully",
+        data: updatedExpense
+      });
+    }
+
+    // Previous date checks
+    const totalRecords = await Expense.countDocuments();
+    if (totalRecords > 0) {
+      const lastExpense = await Expense.findOne({
+        date: { $lt: targetDate }
+      }).sort({ date: -1 });
+
+      if (lastExpense) {
+        const lastDate = new Date(lastExpense.date);
+        lastDate.setHours(0, 0, 0, 0);
+
+        const dayDifference = Math.round((targetDate - lastDate) / (1000 * 60 * 60 * 24));
+        if (dayDifference > 1) {
+          return res.status(400).json({ message: "Please Fill Previous Date Expense Form" });
+        }
+      } else {
+        return res.status(400).json({ message: "Cannot insert a date before the earliest existing record." });
+      }
+    }
+
+    const newExpense = new Expense(expenseData);
     await newExpense.save();
     return res.status(201).json(newExpense);
   } catch (error) {
