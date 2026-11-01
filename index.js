@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
+const connectDB = require('./config/db');
 
 dotenv.config();
 
@@ -10,27 +11,22 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI)
-    .then(() => {
-        console.log('Connected to MongoDB');
-    })
-    .catch((error) => {
-        console.error('Error connecting to MongoDB:', error);
-    });
-
-
     
 // Routes
 const expenseFormRoutes = require('./route/expense_form');
 app.use('/api', expenseFormRoutes);
 
 
+const authAPIRoute = require('./route/auth_route')
+app.use('/api/auth', authAPIRoute);
+
 
 
 // Server
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
+  });
 });

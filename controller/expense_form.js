@@ -1,35 +1,52 @@
-const {Expense} = require('../model/expense_form_model');
+const { Expense, ExtraExpense } = require('../model/expense_form_model');
+const {
+  LOCATIONS,
+  DA_RATES,
+  FARE_RATE_PER_KM,
+  MESSAGES,
+  TIME,
+} = require('../constants/expense_constants');
 
+/**
+ * Create or update an existing daily expense form
+ */
 const addExpenseForm = async (req, res) => {
   try {
     const { to, from, distance, orderbooked, date, location } = req.body;
+    const userId = req.user ? req.user._id : null; // Populated by authMiddleware
 
-    const da = location === "in" ? 300 : 1200;
-    const fare = Number(distance) * 2.5;
+    // 1. Calculations using constants
+    const numDistance = Number(distance) || 0;
+    const da = DA_RATES[location] ?? DA_RATES[LOCATIONS.LOCAL];
+    const fare = numDistance * FARE_RATE_PER_KM;
     const totalAmount = fare + da;
 
+    // 2. Normalize target date to midnight UTC
     const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0);
+    targetDate.setUTCHours(0, 0, 0, 0);
 
-    // Plain data object without an automatic _id
     const expenseData = {
       to,
       from,
-      distance: Number(distance),
+      distance: numDistance,
       da,
-      orderbooked: Number(orderbooked),
+      orderbooked: Number(orderbooked) || 0,
       date: targetDate,
       fare,
       totalAmount,
-      location
+      location,
+      ...(userId && { userId }),
     };
 
-    // Prevent duplicate entries for the same date
+    // 3. Prevent duplicate entries for the same date (scoped to user)
     const nextDay = new Date(targetDate);
-    nextDay.setDate(targetDate.getDate() + 1);
+    nextDay.setUTCDate(targetDate.getUTCDate() + 1);
+
+    const userScope = userId ? { userId } : {};
 
     const existingExpense = await Expense.findOne({
-      date: { $gte: targetDate, $lt: nextDay }
+      ...userScope,
+      date: { $gte: targetDate, $lt: nextDay },
     });
 
     if (existingExpense) {
@@ -39,61 +56,79 @@ const addExpenseForm = async (req, res) => {
         { new: true, runValidators: true }
       );
       return res.status(200).json({
-        message: "Expense updated successfully",
-        data: updatedExpense
+        message: MESSAGES.EXPENSE_UPDATED || "Expense updated successfully",
+        data: updatedExpense,
       });
     }
 
-    // Previous date checks
-    const totalRecords = await Expense.countDocuments();
+    // 4. Sequential date validation (scoped to user)
+    const totalRecords = await Expense.countDocuments(userScope);
+
     if (totalRecords > 0) {
       const lastExpense = await Expense.findOne({
-        date: { $lt: targetDate }
+        ...userScope,
+        date: { $lt: targetDate },
       }).sort({ date: -1 });
 
       if (lastExpense) {
         const lastDate = new Date(lastExpense.date);
-        lastDate.setHours(0, 0, 0, 0);
+        lastDate.setUTCHours(0, 0, 0, 0);
 
-        const dayDifference = Math.round((targetDate - lastDate) / (1000 * 60 * 60 * 24));
+        const dayDifference = Math.round((targetDate - lastDate) / TIME.ONE_DAY_MS);
+
         if (dayDifference > 1) {
-          return res.status(400).json({ message: "Please Fill Previous Date Expense Form" });
+          return res.status(400).json({
+            message: MESSAGES.DATE_GAP_ERROR || "Please Fill Previous Date Expense Form",
+          });
         }
       } else {
-        return res.status(400).json({ message: "Cannot insert a date before the earliest existing record." });
+        return res.status(400).json({
+          message: MESSAGES.PRIOR_DATE_ERROR || "Cannot insert a date before the earliest existing record.",
+        });
       }
     }
 
     const newExpense = new Expense(expenseData);
     await newExpense.save();
-    return res.status(201).json(newExpense);
+
+    return res.status(201).json({
+      message: MESSAGES.EXPENSE_CREATED || "Expense submitted successfully",
+      data: newExpense,
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
 };
 
+/**
+ * Retrieve expense forms with filtering and user scope
+ */
 const getExpenseForms = async (req, res) => {
   try {
     const { location, date, month, year, fromDate, toDate, from } = req.query;
+    const userId = req.user ? req.user._id : null;
 
     const filter = {};
 
-    // 1. Filter by Location (case-insensitive)
+    if (userId) {
+      filter.userId = userId;
+    }
+
+    // 1. Filter by Location
     if (location) {
       filter.location = { $regex: location, $options: 'i' };
     }
 
-    // 2. Filter by 'from' (if it represents a sender, vendor, or user)
-   if (from) {
-  filter.$or = [
-    { from: { $regex: from, $options: 'i' } },
-    { fromStation: { $regex: from, $options: 'i' } }
-  ];
-}
+    // 2. Filter by Origin / Station
+    if (from) {
+      filter.$or = [
+        { from: { $regex: from, $options: 'i' } },
+        { fromStation: { $regex: from, $options: 'i' } },
+      ];
+    }
 
     // 3. Date Filtering
     if (date) {
-      // Matches the exact single day (00:00:00 to 23:59:59)
       const startOfDay = new Date(date);
       startOfDay.setUTCHours(0, 0, 0, 0);
 
@@ -102,55 +137,64 @@ const getExpenseForms = async (req, res) => {
 
       filter.date = { $gte: startOfDay, $lte: endOfDay };
     } else if (month) {
-      // Matches an entire month (e.g., month=10, year=2026)
       const targetYear = parseInt(year, 10) || new Date().getUTCFullYear();
-      const targetMonth = parseInt(month, 10) - 1; // JavaScript months are 0-indexed (0 = Jan, 9 = Oct)
+      const targetMonth = parseInt(month, 10) - 1;
 
       const startOfMonth = new Date(Date.UTC(targetYear, targetMonth, 1));
       const endOfMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0, 23, 59, 59, 999));
 
       filter.date = { $gte: startOfMonth, $lte: endOfMonth };
     } else if (fromDate || toDate) {
-      // If 'from' meant a start date range (e.g., fromDate to toDate)
       filter.date = {};
-      if (fromDate) filter.date.$gte = new Date(fromDate);
-      if (toDate) filter.date.$lte = new Date(toDate);
+      if (fromDate) {
+        const start = new Date(fromDate);
+        start.setUTCHours(0, 0, 0, 0);
+        filter.date.$gte = start;
+      }
+      if (toDate) {
+        const end = new Date(toDate);
+        end.setUTCHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
     }
 
     const expenses = await Expense.find(filter).sort({ date: -1 });
 
-    res.status(200).json({
+    return res.status(200).json({
       count: expenses.length,
       data: expenses,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.status(500).json({ message: error.message });
   }
 };
 
-const {ExtraExpense} = require('../model/expense_form_model'); // Adjust path to your model
-
+/**
+ * Record miscellaneous or operational expenses
+ */
 const extraExpense = async (req, res) => {
   try {
     const { post, photocopy, mobileAllo, date } = req.body;
+    const userId = req.user ? req.user._id : null;
 
-    // Convert and default values to 0 if not provided
     const parsedPost = Number(post) || 0;
     const parsedPhotocopy = Number(photocopy) || 0;
     const parsedMobileAllo = Number(mobileAllo) || 0;
 
-    // Calculate total
     const totalExpense = parsedPost + parsedPhotocopy + parsedMobileAllo;
 
-    const newExpense = new ExtraExpense({
+    const expenseDate = date ? new Date(date) : new Date();
+
+    const newExtraExpense = new ExtraExpense({
       post: parsedPost,
       photocopy: parsedPhotocopy,
       mobileAllo: parsedMobileAllo,
       totalExpense,
-      date: date ? new Date(date) : new Date(),
+      date: expenseDate,
+      ...(userId && { userId }),
     });
 
-    const savedExpense = await newExpense.save();
+    const savedExpense = await newExtraExpense.save();
 
     return res.status(201).json({
       success: true,
@@ -158,13 +202,15 @@ const extraExpense = async (req, res) => {
       data: savedExpense,
     });
   } catch (err) {
-    return res.status(500).json({ 
-      success: false, 
-      message: err.message 
+    return res.status(500).json({
+      success: false,
+      message: err.message,
     });
   }
 };
 
-exports.extraExpense = extraExpense;
-exports.addExpenseForm = addExpenseForm;
-exports.getExpenseForms = getExpenseForms;
+module.exports = {
+  addExpenseForm,
+  getExpenseForms,
+  extraExpense,
+};
