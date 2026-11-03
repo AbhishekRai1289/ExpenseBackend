@@ -160,10 +160,11 @@ const getExpenseForms = async (req, res) => {
 
     const expenses = await Expense.find(filter).sort({ date: -1 });
 
-    return res.status(200).json({
-      count: expenses.length,
-      data: expenses,
-    });
+    // return res.status(200).json({
+    //   count: expenses.length,
+    //   data: expenses,
+    // });
+    return res.status(200).json(expenses);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
