@@ -158,7 +158,7 @@ const getExpenseForms = async (req, res) => {
       }
     }
 
-    const expenses = await Expense.find(filter).sort({ date: -1 });
+    const expenses = await Expense.find(filter).sort({ date: 1 });
 
     // return res.status(200).json({
     //   count: expenses.length,
