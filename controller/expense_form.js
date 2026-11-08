@@ -210,6 +210,32 @@ const extraExpense = async (req, res) => {
   }
 };
 
+
+const getExtraExpenses = async (req, res) => {
+  try{
+    const {month} = req.query;
+    const userId = req.user ? req.user._id : null;
+    const getData = await ExtraExpense.find({userId: userId, month: month});
+    if(getData.length > 0){
+      return res.status(200).json({
+        success: true,
+        data: getData
+      });
+    }
+    else{
+      return res.status(404).json({
+        success: false,
+        message: "No data found for the specified month"
+      });
+    }
+  }
+  catch(err){
+    return res.status(500).json({
+      success: false,
+      message: err.message
+    });
+  }
+}
 module.exports = {
   addExpenseForm,
   getExpenseForms,
