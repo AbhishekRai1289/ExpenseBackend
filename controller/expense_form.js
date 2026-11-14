@@ -175,6 +175,13 @@ const getExpenseForms = async (req, res) => {
  */
 const extraExpense = async (req, res) => {
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request body is required. Send the expense data as JSON.',
+      });
+    }
+
     const { post, photocopy, mobileAllo, date } = req.body;
     const userId = req.user ? req.user._id : null;
 
@@ -212,32 +219,58 @@ const extraExpense = async (req, res) => {
 
 
 const getExtraExpenses = async (req, res) => {
-  try{
-    const {month} = req.query;
+  try {
+    const { month, year } = req.query;
     const userId = req.user ? req.user._id : null;
-    const getData = await ExtraExpense.find({userId: userId, month: month});
-    if(getData.length > 0){
+
+    const targetYear = parseInt(year, 10) || new Date().getUTCFullYear();
+    const targetMonth = parseInt(month, 10);
+
+    if (!targetMonth || targetMonth < 1 || targetMonth > 12) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid month. Provide month between 1 and 12"
+      });
+    }
+
+    const startDate = new Date(
+      Date.UTC(targetYear, targetMonth - 1, 1)
+    );
+
+    const endDate = new Date(
+      Date.UTC(targetYear, targetMonth, 1)
+    );
+
+    const getData = await ExtraExpense.find({
+      userId: userId,
+      date: {
+        $gte: startDate,
+        $lt: endDate
+      }
+    }).sort({ date: 1 });
+
+    if (getData.length > 0) {
       return res.status(200).json({
         success: true,
         data: getData
       });
     }
-    else{
-      return res.status(404).json({
-        success: false,
-        message: "No data found for the specified month"
-      });
-    }
-  }
-  catch(err){
+
+    return res.status(404).json({
+      success: false,
+      message: "No data found for the specified month"
+    });
+
+  } catch (err) {
     return res.status(500).json({
       success: false,
       message: err.message
     });
   }
-}
+};
 module.exports = {
   addExpenseForm,
   getExpenseForms,
   extraExpense,
+  getExtraExpenses
 };

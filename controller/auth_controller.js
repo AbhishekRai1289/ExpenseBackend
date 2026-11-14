@@ -5,7 +5,7 @@ const generateToken = require('../utils/generateToken');
 
 const register = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, companyName, companyAddress, role } = req.body;
 
     // 1. Basic validation
     if (!name || !email || !password) {
@@ -26,9 +26,10 @@ const register = async (req, res) => {
     // 4. Create user
     const newUser = await User.create({
       name: name.trim(),
+      companyName: companyName ? companyName.trim() : '',
+      companyAddress: companyAddress ? companyAddress.trim() : '',
       email: normalizedEmail,
       password: hashedPassword,
-     
     });
 
     // 5. Generate token
@@ -40,6 +41,8 @@ const register = async (req, res) => {
       user: {
         id: newUser._id,
         name: newUser.name,
+        companyName: newUser.companyName,
+        companyAddress: newUser.companyAddress,
         email: newUser.email,
         role: newUser.role,
       },
